@@ -11,8 +11,13 @@ import tempfile
 pygame.init()
 pygame.mixer.init()  # サウンド機能の初期化
 
-# 画面設定
-WIDTH, HEIGHT = 800, 600
+# ピクセル表現のための設定
+PIXEL_SIZE = 4  # ピクセルの大きさ
+ORIGINAL_WIDTH, ORIGINAL_HEIGHT = 200, 150  # 元の解像度
+WIDTH, HEIGHT = ORIGINAL_WIDTH * PIXEL_SIZE, ORIGINAL_HEIGHT * PIXEL_SIZE  # 実際の画面サイズ
+
+# ピクセル化された画面を作成
+pixel_surface = pygame.Surface((ORIGINAL_WIDTH, ORIGINAL_HEIGHT))
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("アルパカジャンプ")
 
@@ -138,6 +143,21 @@ def preload_initial_sounds():
     for i in range(1, 11):
         generate_sound(i)
 
+# ピクセル化された描画を行う関数
+def draw_pixel_rect(surface, color, rect):
+    x, y, w, h = rect
+    for i in range(w):
+        for j in range(h):
+            surface.set_at((x + i, y + j), color)
+
+def draw_pixel_circle(surface, color, center, radius):
+    x0, y0 = center
+    for x in range(x0 - radius, x0 + radius + 1):
+        for y in range(y0 - radius, y0 + radius + 1):
+            if 0 <= x < ORIGINAL_WIDTH and 0 <= y < ORIGINAL_HEIGHT:
+                if (x - x0)**2 + (y - y0)**2 <= radius**2:
+                    surface.set_at((x, y), color)
+
 # 画像のロード
 def load_image(name, scale=1.0):
     try:
@@ -158,19 +178,19 @@ def load_image(name, scale=1.0):
 # 画像がない場合のためのダミー画像を作成
 def create_dummy_images():
     # アルパカのダミー画像
-    alpaca_img = pygame.Surface((80, 100), pygame.SRCALPHA)
-    pygame.draw.ellipse(alpaca_img, WHITE, (0, 30, 80, 60))  # 体
-    pygame.draw.rect(alpaca_img, WHITE, (50, 0, 20, 40))  # 首
-    pygame.draw.ellipse(alpaca_img, WHITE, (40, 0, 40, 30))  # 頭
-    pygame.draw.rect(alpaca_img, BLACK, (10, 70, 10, 30))  # 前足
-    pygame.draw.rect(alpaca_img, BLACK, (60, 70, 10, 30))  # 後ろ足
+    alpaca_img = pygame.Surface((20, 25), pygame.SRCALPHA)
+    pygame.draw.ellipse(alpaca_img, WHITE, (0, 6, 16, 12))  # 体
+    pygame.draw.rect(alpaca_img, WHITE, (10, 0, 4, 8))  # 首
+    pygame.draw.ellipse(alpaca_img, WHITE, (8, 0, 8, 6))  # 頭
+    pygame.draw.rect(alpaca_img, BLACK, (2, 14, 2, 6))  # 前足
+    pygame.draw.rect(alpaca_img, BLACK, (12, 14, 2, 6))  # 後ろ足
     
     # 柵のダミー画像
-    fence_img = pygame.Surface((40, 60), pygame.SRCALPHA)
-    pygame.draw.rect(fence_img, BROWN, (0, 0, 8, 60))  # 左の柱
-    pygame.draw.rect(fence_img, BROWN, (32, 0, 8, 60))  # 右の柱
-    pygame.draw.rect(fence_img, BROWN, (0, 15, 40, 6))  # 上の横木
-    pygame.draw.rect(fence_img, BROWN, (0, 40, 40, 6))  # 下の横木
+    fence_img = pygame.Surface((10, 15), pygame.SRCALPHA)
+    pygame.draw.rect(fence_img, BROWN, (0, 0, 2, 15))  # 左の柱
+    pygame.draw.rect(fence_img, BROWN, (8, 0, 2, 15))  # 右の柱
+    pygame.draw.rect(fence_img, BROWN, (0, 4, 10, 2))  # 上の横木
+    pygame.draw.rect(fence_img, BROWN, (0, 10, 10, 2))  # 下の横木
     
     # 画像を保存
     os.makedirs('images', exist_ok=True)
@@ -192,19 +212,19 @@ class Alpaca:
         self.width = self.image.get_width()
         self.height = self.image.get_height()
         self.x = x
-        self.y = HEIGHT - self.height - 50  # 地面からの高さ
+        self.y = ORIGINAL_HEIGHT - self.height - 10  # 地面からの高さ
         self.jumping = False
         self.jump_time = 0
         self.jump_duration = 90  # ジャンプの持続時間（フレーム数）
-        self.jump_height = 150  # ジャンプの最大高さ
-        # 速度をランダムに設定（2.0〜4.0の範囲）
-        self.horizontal_speed = 2.0 + random.random() * 2.0
+        self.jump_height = 30  # ジャンプの最大高さ（ピクセル解像度に合わせて調整）
+        # 速度をランダムに設定（0.5〜1.0の範囲）
+        self.horizontal_speed = 0.5 + random.random() * 0.5
         self.passed_fence = False
         self.original_y = self.y  # 元の高さを記録
         self.original_x = self.x  # 元のX位置を記録
         
-    def draw(self, screen):
-        screen.blit(self.image, (self.x, self.y))
+    def draw(self, surface):
+        surface.blit(self.image, (int(self.x), int(self.y)))
         
     def jump(self):
         if not self.jumping:
@@ -235,7 +255,7 @@ class Alpaca:
             self.x += self.horizontal_speed
         
     def get_rect(self):
-        return pygame.Rect(self.x + 10, self.y + 10, self.width - 20, self.height - 20)
+        return pygame.Rect(int(self.x) + 2, int(self.y) + 2, self.width - 4, self.height - 4)
 
 # 柵のクラス
 class Fence:
@@ -243,11 +263,11 @@ class Fence:
         self.image = fence_img
         self.width = self.image.get_width()
         self.height = self.image.get_height()
-        self.x = WIDTH // 2 - self.width // 2  # 画面中央に配置
-        self.y = HEIGHT - self.height - 50  # 地面からの高さ
+        self.x = ORIGINAL_WIDTH // 2 - self.width // 2  # 画面中央に配置
+        self.y = ORIGINAL_HEIGHT - self.height - 10  # 地面からの高さ
         
-    def draw(self, screen):
-        screen.blit(self.image, (self.x, self.y))
+    def draw(self, surface):
+        surface.blit(self.image, (self.x, self.y))
         
     def get_rect(self):
         return pygame.Rect(self.x, self.y, self.width, self.height)
@@ -258,32 +278,32 @@ class Game:
         self.alpacas = []
         self.fence = Fence()
         self.score = 0
-        self.font = pygame.font.SysFont(None, 36)
+        self.font = pygame.font.SysFont(None, 18)  # フォントサイズを大きくして読みやすく
         self.spawn_timer = 0
         self.spawn_interval = 150  # フレーム単位でのアルパカの生成間隔
         self.last_played_sound = 0  # 最後に再生した音声のスコア
         
         # 夜空の星を生成（位置、サイズ）
         self.stars = []
-        for _ in range(100):
-            x = random.randint(0, WIDTH)
-            y = random.randint(0, HEIGHT - 100)
-            size = random.random() * 2 + 0.5  # 0.5〜2.5の範囲
+        for _ in range(30):  # 星の数を減らして解像度に合わせる
+            x = random.randint(0, ORIGINAL_WIDTH)
+            y = random.randint(0, ORIGINAL_HEIGHT - 20)
+            size = random.random() + 0.5  # 0.5〜1.5の範囲
             self.stars.append([(x, y), size])
             
         # 雲を生成
         self.clouds = []
-        for _ in range(5):
-            x = random.randint(0, WIDTH)
-            y = random.randint(50, 200)
-            size = random.randint(30, 80)
+        for _ in range(3):  # 雲の数を減らして解像度に合わせる
+            x = random.randint(0, ORIGINAL_WIDTH)
+            y = random.randint(10, 40)
+            size = random.randint(8, 16)
             self.clouds.append([x, y, size])
         
         # 次のスコアの音声を先読み
         self.preload_next_sounds()
         
     def spawn_alpaca(self):
-        self.alpacas.append(Alpaca(-100))  # 画面左外から登場
+        self.alpacas.append(Alpaca(-20))  # 画面左外から登場
         
     def update(self):
         # アルパカの生成
@@ -296,10 +316,10 @@ class Game:
         
         # 雲を動かす
         for cloud in self.clouds:
-            cloud[0] -= 0.2  # 雲をゆっくり左に動かす
+            cloud[0] -= 0.1  # 雲をゆっくり左に動かす
             if cloud[0] < -cloud[2] * 2:
-                cloud[0] = WIDTH + cloud[2]
-                cloud[1] = random.randint(50, 200)
+                cloud[0] = ORIGINAL_WIDTH + cloud[2]
+                cloud[1] = random.randint(10, 40)
         
         # アルパカの更新
         for alpaca in self.alpacas[:]:
@@ -319,7 +339,7 @@ class Game:
                     self.preload_next_sounds()
                 
             # 画面外のアルパカを削除
-            if alpaca.x > WIDTH + 100:
+            if alpaca.x > ORIGINAL_WIDTH + 20:
                 self.alpacas.remove(alpaca)
                 
             # 衝突判定
@@ -351,39 +371,43 @@ class Game:
         generate_sound_async(next_score + 1)
         generate_sound_async(next_score + 2)
     
-    def draw(self, screen):
+    def draw(self, surface):
         # 背景
         # 夜空の背景（濃い青）
-        screen.fill(DARK_BLUE)  # 暗い青色で夜空を表現
+        surface.fill(DARK_BLUE)  # 暗い青色で夜空を表現
         
         # 星をランダムに描画
         for star in self.stars:
-            pygame.draw.circle(screen, WHITE, star[0], star[1])
+            pos, size = star
+            draw_pixel_circle(surface, WHITE, pos, int(size))
         
         # 月を描画
-        pygame.draw.circle(screen, MOON_COLOR, (WIDTH - 100, 100), 40)
-        pygame.draw.circle(screen, DARK_BLUE, (WIDTH - 120, 85), 40)  # 三日月風の影
+        draw_pixel_circle(surface, MOON_COLOR, (ORIGINAL_WIDTH - 20, 20), 8)
+        draw_pixel_circle(surface, DARK_BLUE, (ORIGINAL_WIDTH - 24, 17), 8)  # 三日月風の影
         
-        # 雲を描画
+        # 雲を描画（ピクセル風に）
         for cloud in self.clouds:
             x, y, size = cloud
-            pygame.draw.ellipse(screen, CLOUD_COLOR, (x, y, size * 2, size))
-            pygame.draw.ellipse(screen, CLOUD_COLOR, (x + size, y - size//2, size * 1.5, size))
-            pygame.draw.ellipse(screen, CLOUD_COLOR, (x + size//2, y + size//4, size * 1.5, size))
+            draw_pixel_rect(surface, CLOUD_COLOR, (int(x), int(y), size, size // 2))
+            draw_pixel_rect(surface, CLOUD_COLOR, (int(x + size // 2), int(y - size // 4), size // 2, size // 2))
         
         # 地面（暗い緑）
-        pygame.draw.rect(screen, DARK_GREEN, (0, HEIGHT - 50, WIDTH, 50))  # 暗い緑色の地面
+        draw_pixel_rect(surface, DARK_GREEN, (0, ORIGINAL_HEIGHT - 10, ORIGINAL_WIDTH, 10))  # 暗い緑色の地面
         
         # 柵の描画
-        self.fence.draw(screen)
+        self.fence.draw(surface)
         
         # アルパカの描画
         for alpaca in self.alpacas:
-            alpaca.draw(screen)
+            alpaca.draw(surface)
         
         # スコア表示（中央上部に配置）
         score_text = self.font.render(f"Score: {self.score}", True, WHITE)
-        screen.blit(score_text, (WIDTH//2 - score_text.get_width()//2, 20))
+        # 背景を追加して読みやすく
+        score_bg = pygame.Surface((score_text.get_width() + 4, score_text.get_height() + 4))
+        score_bg.fill(DARK_BLUE)
+        surface.blit(score_bg, (ORIGINAL_WIDTH//2 - score_text.get_width()//2 - 2, 4))
+        surface.blit(score_text, (ORIGINAL_WIDTH//2 - score_text.get_width()//2, 6))
 
 # メインゲームループ
 def main():
@@ -399,10 +423,10 @@ def main():
     
     # ゲームオーバー時の星を生成
     game_over_stars = []
-    for i in range(100):
-        x = random.randint(0, WIDTH)
-        y = random.randint(0, HEIGHT)
-        size = random.random() * 3 + 0.5
+    for i in range(30):
+        x = random.randint(0, ORIGINAL_WIDTH)
+        y = random.randint(0, ORIGINAL_HEIGHT)
+        size = random.random() + 0.5
         game_over_stars.append([(x, y), size])
     
     while running:
@@ -418,46 +442,56 @@ def main():
                     for alpaca in game.alpacas:
                         if not alpaca.passed_fence:
                             distance = game.fence.x - alpaca.x
-                            if 0 < distance < min_distance and distance < 300:  # 距離制限を追加
+                            if 0 < distance < min_distance and distance < 60:  # 距離制限を調整
                                 min_distance = distance
                                 closest_alpaca = alpaca
                     
                     if closest_alpaca:
                         closest_alpaca.jump()
                         
-                if event.key == pygame.K_r and not game_active:
+                elif event.key == pygame.K_r and not game_active:
                     # リスタート
                     game = Game()
                     game_active = True
+                # エンターキーとRキーを明確に区別
+                elif event.key == pygame.K_RETURN or event.key == pygame.K_KP_ENTER:
+                    # エンターキーの処理（必要に応じて）
+                    pass
+        
+        # ピクセル画面をクリア
+        pixel_surface.fill((0, 0, 0))
         
         if game_active:
             game_active = game.update()
-            game.draw(screen)
+            game.draw(pixel_surface)
         else:
             # ゲームオーバー画面
-            screen.fill(DARK_BLUE)
+            pixel_surface.fill(DARK_BLUE)
             
             # 星をランダムに描画（ゲームオーバー画面でも）
             for star in game_over_stars:
                 pos, size = star
-                pygame.draw.circle(screen, WHITE, pos, size)
+                draw_pixel_circle(pixel_surface, WHITE, pos, int(size))
             
             # ゲームオーバーのテキスト表示
-            font = pygame.font.SysFont(None, 72)
+            font = pygame.font.SysFont(None, 24)  # フォントサイズを大きくして読みやすく
             game_over_text = font.render("Game Over", True, WHITE)
             score_text = font.render(f"Score: {game.score}", True, WHITE)
             restart_text = font.render("Press R to Restart", True, WHITE)
             
             # 「おやすみなさい」のメッセージを追加
             if game.score > 10:
-                goodnight_font = pygame.font.SysFont(None, 48)
+                goodnight_font = pygame.font.SysFont(None, 18)
                 goodnight_text = goodnight_font.render("Good Night...", True, WHITE)
-                screen.blit(goodnight_text, (WIDTH//2 - goodnight_text.get_width()//2, HEIGHT//2 + 150))
+                pixel_surface.blit(goodnight_text, (ORIGINAL_WIDTH//2 - goodnight_text.get_width()//2, ORIGINAL_HEIGHT//2 + 30))
             
             # テキストを直接描画
-            screen.blit(game_over_text, (WIDTH//2 - game_over_text.get_width()//2, HEIGHT//2 - 100))
-            screen.blit(score_text, (WIDTH//2 - score_text.get_width()//2, HEIGHT//2))
-            screen.blit(restart_text, (WIDTH//2 - restart_text.get_width()//2, HEIGHT//2 + 100))
+            pixel_surface.blit(game_over_text, (ORIGINAL_WIDTH//2 - game_over_text.get_width()//2, ORIGINAL_HEIGHT//2 - 20))
+            pixel_surface.blit(score_text, (ORIGINAL_WIDTH//2 - score_text.get_width()//2, ORIGINAL_HEIGHT//2))
+            pixel_surface.blit(restart_text, (ORIGINAL_WIDTH//2 - restart_text.get_width()//2, ORIGINAL_HEIGHT//2 + 20))
+        
+        # ピクセル画面を実際の画面サイズに拡大
+        pygame.transform.scale(pixel_surface, (WIDTH, HEIGHT), screen)
         
         pygame.display.flip()
         clock.tick(60)
