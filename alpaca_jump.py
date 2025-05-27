@@ -19,7 +19,7 @@ WIDTH, HEIGHT = ORIGINAL_WIDTH * PIXEL_SIZE, ORIGINAL_HEIGHT * PIXEL_SIZE  # 実
 # ピクセル化された画面を作成
 pixel_surface = pygame.Surface((ORIGINAL_WIDTH, ORIGINAL_HEIGHT))
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("アルパカジャンプ")
+pygame.display.set_caption("Flying Alpaca")
 
 # 色の定義
 WHITE = (255, 255, 255)
