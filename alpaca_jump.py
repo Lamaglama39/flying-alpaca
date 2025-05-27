@@ -435,18 +435,17 @@ def main():
                 running = False
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE and game_active:
-                    # 最も柵に近いアルパカをジャンプさせる
-                    closest_alpaca = None
-                    min_distance = float('inf')
+                    # 柵の前にいるアルパカをジャンプさせる（距離制限なし）
+                    jumpable_alpacas = []
                     
                     for alpaca in game.alpacas:
-                        if not alpaca.passed_fence:
-                            distance = game.fence.x - alpaca.x
-                            if 0 < distance < min_distance and distance < 60:  # 距離制限を調整
-                                min_distance = distance
-                                closest_alpaca = alpaca
+                        if not alpaca.passed_fence and alpaca.x < game.fence.x:
+                            # 柵の前にいて、まだ柵を通過していないアルパカをリストに追加
+                            jumpable_alpacas.append(alpaca)
                     
-                    if closest_alpaca:
+                    if jumpable_alpacas:
+                        # 柵に最も近いアルパカを選択
+                        closest_alpaca = min(jumpable_alpacas, key=lambda a: game.fence.x - a.x)
                         closest_alpaca.jump()
                         
                 elif event.key == pygame.K_r and not game_active:
